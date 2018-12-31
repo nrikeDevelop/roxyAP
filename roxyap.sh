@@ -45,7 +45,7 @@ function configure_dnsmasq(){   # $1 ip wifi[GATEWAY] $2 range1 $3 range2
 	sudo ifconfig ${interface[$i_interface]} $1
 	sudo ifconfig ${interface[$i_interface]} up
 
-	path_dnsmasq="/var/roxyap/dnsmas.conf"
+	path_dnsmasq="/var/roxyap/dnsmasq.conf"
     if [ ! -f $path_dnsmasq ]
     then 
         mkdir -p /var/roxyap
@@ -151,6 +151,17 @@ function configure_IP_DNS (){
     clear
 }
 
+#iptables 
+function iptables_forward(){
+
+	sudo bash -c 'echo 1 > /proc/sys/net/ipv4/ip_forward'
+
+	iptables -F
+	iptables -t nat -F
+	iptables -A FORWARD -i $i_interface -o $o_interface -j ACCEPT
+	iptables -t nat -A POSTROUTIN -o $o_interface -j MASQUERADE
+}
+
 function run(){
 
 	#kill proceess that use dns port
@@ -166,17 +177,16 @@ function run(){
 
 }
 
-#iptables 
+
 
 #MAIN
-
-
 # trap ctrl-c and call ctrl_c()
 trap ctrl_c INT
 
 function ctrl_c() {
-        echo_e red "Stopping services"
-	echo_e yellow "Exiting ..."
+    echo ""
+	echo_e red "[-] Stopping services"
+	
 	sudo service hostapd stop
 	sudo service dnsmasq stop
 
@@ -185,12 +195,23 @@ function ctrl_c() {
 	do 
 		sudo kill -9  $i
 	done
+	echo_e yellow "[-] dnsmasq stoped"
 
-	 #kill process hostapd
-        for i in `ps aux | grep hostapd | tr -s " " " " | grep root | cut -f2 -d" "`
-        do 
-                sudo kill -9  $i
-        done
+	#kill process hostapd
+    for i in `ps aux | grep hostapd | tr -s " " " " | grep root | cut -f2 -d" "`
+    do 
+            sudo kill -9  $i
+    done
+	echo_e yellow "[-] hostapd stoped"
+
+	sudo bash -c 'echo 0 > /proc/sys/net/ipv4/ip_forward'
+	echo_e yellow "[-] restart forward stoped"
+
+	iptables -F
+	iptables -t nat -F
+	echo_e yellow "[-] iptables cleared"
+
+	echo_e yellow "Exiting ..."
 	exit
 }
 
